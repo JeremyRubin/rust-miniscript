@@ -148,6 +148,7 @@ impl<Pk: MiniscriptKey, Ctx: ScriptContext> Terminal<Pk, Ctx> {
                 let keys: Result<Vec<Q>, _> = keys.iter().map(&mut *translatefpk).collect();
                 Terminal::Multi(k, keys?)
             }
+            Terminal::TxTemplate(x) => Terminal::TxTemplate(x),
         };
         Ctx::check_frag_validity(&frag).expect(
             "Translated fragment not valid.\n
@@ -245,6 +246,8 @@ impl<Pk: MiniscriptKey, Ctx: ScriptContext> fmt::Debug for Terminal<Pk, Ctx> {
                     }
                     f.write_str(")")
                 }
+                Terminal::TxTemplate(x) => write!(f, "txtmpl({})", x),
+
                 _ => unreachable!(),
             }
         }
@@ -301,6 +304,7 @@ impl<Pk: MiniscriptKey, Ctx: ScriptContext> fmt::Display for Terminal<Pk, Ctx> {
                 }
                 f.write_str(")")
             }
+            Terminal::TxTemplate(x) => write!(f, "txtmpl({})", x),
             // wrappers
             _ => {
                 if let Some((ch, sub)) = self.wrap_char() {
@@ -503,6 +507,9 @@ where
 
                 pks.map(|pks| Terminal::Multi(k, pks))
             }
+            ("txtmpl", 1) => expression::terminal(&top.args[0], |x| {
+                sha256::Hash::from_hex(x).map(Terminal::TxTemplate)
+            }),
             _ => Err(Error::Unexpected(format!(
                 "{}({} args) while parsing Miniscript",
                 top.name,
@@ -683,6 +690,11 @@ impl<Pk: MiniscriptKey + ToPublicKey, Ctx: ScriptContext> Terminal<Pk, Ctx> {
                     .push_int(keys.len() as i64)
                     .push_opcode(opcodes::all::OP_CHECKMULTISIG)
             }
+            Terminal::TxTemplate(h) => builder
+                // TODO: Update to CHECKTEMPLATEVERIFY
+                .push_slice(&h[..])
+                .push_opcode(opcodes::all::OP_NOP4)
+                .push_opcode(opcodes::all::OP_DROP),
         }
     }
 
@@ -737,6 +749,7 @@ impl<Pk: MiniscriptKey + ToPublicKey, Ctx: ScriptContext> Terminal<Pk, Ctx> {
                     + script_num_size(pks.len())
                     + pks.iter().map(ToPublicKey::serialized_len).sum::<usize>()
             }
+            Terminal::TxTemplate(..) => 33 + 2,
         }
     }
 
@@ -910,6 +923,7 @@ impl<Pk: MiniscriptKey + ToPublicKey, Ctx: ScriptContext> Terminal<Pk, Ctx> {
                     .sum::<usize>()
             }
             Terminal::Multi(k, _) => 1 + k,
+            Terminal::TxTemplate(..) => 0,
         }
     }
 
@@ -989,6 +1003,7 @@ impl<Pk: MiniscriptKey + ToPublicKey, Ctx: ScriptContext> Terminal<Pk, Ctx> {
                     .sum::<usize>()
             }
             Terminal::Multi(k, _) => 1 + 73 * k,
+            Terminal::TxTemplate(..) => 0,
         }
     }
 }

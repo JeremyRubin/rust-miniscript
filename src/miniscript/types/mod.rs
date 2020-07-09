@@ -299,6 +299,9 @@ pub trait Property: Sized {
         Self::from_time(t)
     }
 
+    /// Type property of a `TxTemplate` hash.
+    fn from_txtemplate() -> Self;
+
     /// Cast using the `Alt` wrapper
     fn cast_alt(self) -> Result<Self, ErrorKind>;
 
@@ -508,6 +511,7 @@ pub trait Property: Sized {
                     error: kind,
                 })
             }
+            Terminal::TxTemplate(..) => Ok(Self::from_txtemplate()),
         };
         if let Ok(ref ret) = ret {
             ret.sanity_checks()
@@ -570,6 +574,13 @@ impl Property for Type {
         Type {
             corr: Property::from_sha256(),
             mall: Property::from_sha256(),
+        }
+    }
+
+    fn from_txtemplate() -> Self {
+        Type {
+            corr: Property::from_txtemplate(),
+            mall: Property::from_txtemplate(),
         }
     }
 
@@ -876,6 +887,7 @@ impl Property for Type {
                     error: kind,
                 })
             }
+            Terminal::TxTemplate(..) => Ok(Self::from_txtemplate()),
         };
         if let Ok(ref ret) = ret {
             ret.sanity_checks()
